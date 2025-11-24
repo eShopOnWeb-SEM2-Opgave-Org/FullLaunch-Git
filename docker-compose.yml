@@ -1,0 +1,139 @@
+
+services:
+  ### eShopOnWeb START
+  eshopwebmvc:
+    image: ${DOCKER_REGISTRY-}eshopwebmvc
+    build:
+      context: eShopOnWeb/.
+      dockerfile: src/Web/Dockerfile
+    depends_on:
+      - "sqlserver"
+    environment:
+     - ASPNETCORE_ENVIRONMENT=Docker
+     - ASPNETCORE_URLS=http://+:8080
+     - USE_CATALOG_MICROSERVICE=true
+     - CATALOG_SERVICE_URL=http://catalog-gateway:8080/gateway/
+    ports:
+     - "5106:8080"
+    volumes:
+     - ~/.aspnet/https:/root/.aspnet/https:ro
+     - ~/.microsoft/usersecrets:/root/.microsoft/usersecrets:ro
+    restart: unless-stopped
+  eshoppublicapi:
+    image: ${DOCKER_REGISTRY-}eshoppublicapi
+    build:
+      context: eShopOnWeb/.
+      dockerfile: src/PublicApi/Dockerfile
+    depends_on:
+      - "sqlserver"
+    environment:
+     - ASPNETCORE_ENVIRONMENT=Docker
+     - ASPNETCORE_URLS=http://+:8080
+    ports:
+     - "5200:8080"
+    volumes:
+     - ~/.aspnet/https:/root/.aspnet/https:ro
+     - ~/.microsoft/usersecrets:/root/.microsoft/usersecrets:ro
+    restart: unless-stopped
+  sqlserver:
+    image: mcr.microsoft.com/azure-sql-edge
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD", "sqlcmd", "-S", "localhost", "-U", "sa", "-P", "@sineThingComplicated1234", "-Q", "SELECT 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ./shopData/data/mssql-data:/var/opt/mssql/data
+    environment:
+      - SA_PASSWORD=@someThingComplicated1234
+      - ACCEPT_EULA=Y
+    restart: unless-stopped
+  ### eShopOnWeb END
+
+  ### Gateway START
+  gateway-api:
+    build:
+      context: ./eShopOnWeb.Api.Gateway/
+      dockerfile: ./src/eShopOnWeb.Api.Gateway/Dockerfile
+    ports:
+      - "48080:8080"
+    environment:
+      - HOSTS=catalog=http://catalog-api:8080
+  ### Gateway END
+
+  ### CatalogMicroservice START
+  catalog-api:
+    build:
+      context: ./CatalogMicroservice
+      dockerfile: ./src/CatalogMicroservice.API/Dockerfile
+      no_cache: true
+    ports:
+     - "52080:8080"
+    depends_on:
+     - rabbit-mq
+     - sqlserver
+    restart: unless-stopped
+    environment:
+     - SQL_CONNECTION_STRING=Server=sqlserver,1433;Integrated Security=true;User Id=sa;Password=@someThingComplicated1234;Trusted_Connection=false;TrustServerCertificate=true;
+     - SQL_DATABASE_NAME=Microsoft.eShopOnWeb.CatalogDb
+     - SHOULD_SHOW_SWAGGER=true
+     - USE_INVENTORY_MICROSERVICE=true
+     - RABBITMQ_USER=user
+     - RABBITMQ_PASSWORD=Password123!
+     - RABBITMQ_HOST=rabbit-mq
+     - INVENTORY_BASE_ADDRESS=http://inventory-api:8080/
+  ### CatalogMicroservice END
+
+  ### InventroyMicroservice START
+  inventory-api:
+    build:
+      context: ./InventoryMicroservice
+      dockerfile: ./src/InventoryMicroservice.Api/Dockerfile
+    ports:
+     - "53080:8080"
+    environment:
+    - SQL_CONNECTION_STRING=Data Source=inventory-sqlserver;Integrated Security=false;User ID=sa;Password=@someThingComplicated1234;Encrypt=false;TrustServerCertificate=true;
+    - DATABASE_NAME=InventoryDatabase
+    - SHOULD_SETUP_DATABASE=true
+    - RABBITMQ_USER=user
+    - RABBITMQ_PASS=Password123!
+    - RABBITMQ_HOST=rabbit-mq
+    - RABBITMQ_PORT=5672
+    - SHOULD_SHOW_SWAGGER=true
+    restart: unless-stopped
+    depends_on:
+    - rabbit-mq
+    - inventory-sqlserver
+
+  rabbit-mq:
+    image: rabbitmq:4-management
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    ports:
+    - "15672:15672"
+    - "5671:5672"
+    environment:
+    - RABBITMQ_DEFAULT_USER=user
+    - RABBITMQ_DEFAULT_PASS=Password123!
+
+  inventory-sqlserver:
+    image: mcr.microsoft.com/azure-sql-edge
+    healthcheck:
+      test: ["CMD", "sqlcmd", "-S", "localhost", "-U", "sa", "-P", "yourStrong(!)Password", "-Q", "SELECT 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    ports:
+    - "51433:1433"
+    volumes:
+    - ./inventory/data/mssql:/var/opt/mssql/data
+    environment:
+    - SA_PASSWORD=@someThingComplicated1234
+    - ACCEPT_EULA=Y
+    restart: unless-stopped
+  ### InventoryMicroservice END

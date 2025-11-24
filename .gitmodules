@@ -1,0 +1,12 @@
+[submodule "CatalogMicroservice"]
+	path = CatalogMicroservice
+	url = https://github.com/eShopOnWeb-SEM2-Opgave-Org/CatalogMicroservice.git
+[submodule "InventoryMicroservice"]
+	path = InventoryMicroservice
+	url = https://github.com/eShopOnWeb-SEM2-Opgave-Org/InventoryMicroservice.git
+[submodule "eShopOnWeb"]
+	path = eShopOnWeb
+	url = https://github.com/eShopOnWeb-SEM2-Opgave-Org/eShopOnWeb.git
+[submodule "eShopOnWeb.Api.Gateway"]
+	path = eShopOnWeb.Api.Gateway
+	url = https://github.com/eShopOnWeb-SEM2-Opgave-Org/eShopOnWeb-Api-Gateway.git
