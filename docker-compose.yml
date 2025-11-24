@@ -1,3 +1,5 @@
+volumes:
+  esdata:
 
 services:
   ### eShopOnWeb START
@@ -7,17 +9,17 @@ services:
       context: eShopOnWeb/.
       dockerfile: src/Web/Dockerfile
     depends_on:
-      - "sqlserver"
+    - "sqlserver"
     environment:
-     - ASPNETCORE_ENVIRONMENT=Docker
-     - ASPNETCORE_URLS=http://+:8080
-     - USE_CATALOG_MICROSERVICE=true
-     - CATALOG_SERVICE_URL=http://catalog-gateway:8080/gateway/
+    - ASPNETCORE_ENVIRONMENT=Docker
+    - ASPNETCORE_URLS=http://+:8080
+    - USE_CATALOG_MICROSERVICE=true
+    - CATALOG_SERVICE_URL=http://gateway-api:8080/gateway/
     ports:
-     - "5106:8080"
+    - "5106:8080"
     volumes:
-     - ~/.aspnet/https:/root/.aspnet/https:ro
-     - ~/.microsoft/usersecrets:/root/.microsoft/usersecrets:ro
+    - ~/.aspnet/https:/root/.aspnet/https:ro
+    - ~/.microsoft/usersecrets:/root/.microsoft/usersecrets:ro
     restart: unless-stopped
   eshoppublicapi:
     image: ${DOCKER_REGISTRY-}eshoppublicapi
@@ -25,30 +27,30 @@ services:
       context: eShopOnWeb/.
       dockerfile: src/PublicApi/Dockerfile
     depends_on:
-      - "sqlserver"
+    - "sqlserver"
     environment:
-     - ASPNETCORE_ENVIRONMENT=Docker
-     - ASPNETCORE_URLS=http://+:8080
+    - ASPNETCORE_ENVIRONMENT=Docker
+    - ASPNETCORE_URLS=http://+:8080
     ports:
-     - "5200:8080"
+    - "5200:8080"
     volumes:
-     - ~/.aspnet/https:/root/.aspnet/https:ro
-     - ~/.microsoft/usersecrets:/root/.microsoft/usersecrets:ro
+    - ~/.aspnet/https:/root/.aspnet/https:ro
+    - ~/.microsoft/usersecrets:/root/.microsoft/usersecrets:ro
     restart: unless-stopped
   sqlserver:
     image: mcr.microsoft.com/azure-sql-edge
     ports:
       - "1433:1433"
     healthcheck:
-      test: ["CMD", "sqlcmd", "-S", "localhost", "-U", "sa", "-P", "@sineThingComplicated1234", "-Q", "SELECT 1"]
+      test: ["CMD", "sqlcmd", "-S", "localhost", "-U", "sa", "-P", "@someThingComplicated1234", "-Q", "SELECT 1"]
       interval: 30s
       timeout: 10s
       retries: 5
     volumes:
-      - ./shopData/data/mssql-data:/var/opt/mssql/data
+    - ./shopData/data/mssql-data:/var/opt/mssql/data
     environment:
-      - SA_PASSWORD=@someThingComplicated1234
-      - ACCEPT_EULA=Y
+    - SA_PASSWORD=@someThingComplicated1234
+    - ACCEPT_EULA=Y
     restart: unless-stopped
   ### eShopOnWeb END
 
@@ -58,9 +60,9 @@ services:
       context: ./eShopOnWeb.Api.Gateway/
       dockerfile: ./src/eShopOnWeb.Api.Gateway/Dockerfile
     ports:
-      - "48080:8080"
+    - "48080:8080"
     environment:
-      - HOSTS=catalog=http://catalog-api:8080
+    - HOSTS=catalog=http://catalog-api:8080
   ### Gateway END
 
   ### CatalogMicroservice START
@@ -70,20 +72,49 @@ services:
       dockerfile: ./src/CatalogMicroservice.API/Dockerfile
       no_cache: true
     ports:
-     - "52080:8080"
+    - "52080:8080"
     depends_on:
-     - rabbit-mq
-     - sqlserver
+    - rabbit-mq
+    - sqlserver
     restart: unless-stopped
     environment:
-     - SQL_CONNECTION_STRING=Server=sqlserver,1433;Integrated Security=true;User Id=sa;Password=@someThingComplicated1234;Trusted_Connection=false;TrustServerCertificate=true;
-     - SQL_DATABASE_NAME=Microsoft.eShopOnWeb.CatalogDb
-     - SHOULD_SHOW_SWAGGER=true
-     - USE_INVENTORY_MICROSERVICE=true
-     - RABBITMQ_USER=user
-     - RABBITMQ_PASSWORD=Password123!
-     - RABBITMQ_HOST=rabbit-mq
-     - INVENTORY_BASE_ADDRESS=http://inventory-api:8080/
+    - SQL_CONNECTION_STRING=Server=sqlserver,1433;Integrated Security=true;User Id=sa;Password=@someThingComplicated1234;Trusted_Connection=false;TrustServerCertificate=true;
+    - SQL_DATABASE_NAME=Microsoft.eShopOnWeb.CatalogDb
+    - SHOULD_SHOW_SWAGGER=true
+    - USE_INVENTORY_MICROSERVICE=true
+    - RABBITMQ_USER=user
+    - RABBITMQ_PASSWORD=Password123!
+    - RABBITMQ_HOST=rabbit-mq
+    - INVENTORY_BASE_ADDRESS=http://inventory-api:8080/
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    environment:
+    - discovery.type=single-node
+    - xpack.security.enabled=false # for testing/demo
+    ports:
+    - "9200:9200"
+    volumes:
+    - esdata:/usr/share/elasticsearch/data
+  
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    environment:
+    - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    - xpack.Security.enabled=false
+    ports:
+    - "5601:5601"
+    depends_on:
+    - elasticsearch
+
+  fluent-bit:
+    image: cr.fluentbit.io/fluent/fluent-bit:2.2
+    volumes:
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./CatalogMicroservice/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    depends_on:
+    - elasticsearch
   ### CatalogMicroservice END
 
   ### InventroyMicroservice START
@@ -124,7 +155,7 @@ services:
   inventory-sqlserver:
     image: mcr.microsoft.com/azure-sql-edge
     healthcheck:
-      test: ["CMD", "sqlcmd", "-S", "localhost", "-U", "sa", "-P", "yourStrong(!)Password", "-Q", "SELECT 1"]
+      test: ["CMD", "sqlcmd", "-S", "localhost", "-U", "sa", "-P", "@someThingComplicated1234", "-Q", "SELECT 1"]
       interval: 30s
       timeout: 10s
       retries: 5

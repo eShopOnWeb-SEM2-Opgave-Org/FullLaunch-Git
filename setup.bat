@@ -1,5 +1,7 @@
 @echo off
 
+git submodule update --remote --recursive
+
 rmdir /s/q ".\CatalogMicroservice\src\CheatNuGetSource"
 mkdir ".\CatalogMicroservice\src\CheatNuGetSource"
 
